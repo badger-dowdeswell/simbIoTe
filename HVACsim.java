@@ -15,6 +15,8 @@
 // 
 package HVACsim;
 
+import java.util.concurrent.TimeUnit;
+
 public class HVACsim {
 	public static String appVersion = "1.1";
 	private static boolean silence = false;
@@ -23,7 +25,23 @@ public class HVACsim {
 	// main()
 	// ======
 	public static void main(String[] args) {
+		
+		
 		say("HVAC Simulator version " + appVersion + "\n");
+		
+		TCPserverPacket packet = new TCPserverPacket();
+		String dataPacket = "";	
+		TCPserver server = new TCPserver("127.0.0.1", 62501);
+		new Thread(server).start();
+		
+		// Monitor the network. Read the incoming SIFB data queues until they are empty 
+		do {
+			while (server.getQueueSize() > 0) {
+				packet = server.getPacket();
+				System.err.println("Received_" + packet.getSIFBinstanceID() + " [" + packet.getdataPacket() + "] [" + server.getQueueSize() + "]");
+			}
+			delay((long) 1);
+		} while(true);
 	}
 	
 	//
@@ -38,4 +56,15 @@ public class HVACsim {
 			System.err.println(whatToSay);
 		}
 	}	
+	
+	//
+	// delay()
+	// =======
+	private static void delay(Long delayTime) {
+		try {
+			TimeUnit.SECONDS.sleep((long) delayTime);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}	
+	}
 }
