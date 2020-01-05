@@ -41,11 +41,18 @@ public class HVACsim {
 		EnvironmentUI ui;
 		
 		say("HVAC Simulator version " + appVersion + "\n");
-		ui = new EnvironmentUI("HVAC Simulator version " + appVersion, 200,300, 800, 500);
-		//ui.setVisible(true);
+		// windowTop, windowLeft, windowWidth, windowHeight
+		ui = new EnvironmentUI("HVAC Simulator version " + appVersion, 200, 200, 800, 500);
+		startServer("127.0.0.1", 62501, ui);
 	}	
-		
-
+	
+	//
+	// startServer()
+	// =============
+	private static void startServer(String hostName, int listenerPortNumber, EnvironmentUI ui) {	
+		TCPserver server = new TCPserver("127.0.0.1", 62501, ui);
+		new Thread(server).start();
+	}
 		
 		
 	//	TCPserverPacket packet = new TCPserverPacket();

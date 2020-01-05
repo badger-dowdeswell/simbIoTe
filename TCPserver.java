@@ -23,6 +23,10 @@
 // ================
 // 18.12.2019 BRD Original version based on the Fault Diagnostic Engine (FDE)
 //				  version created on 05.07.2019	
+// 02.01.2020 BRD Extending the server to manage direct interaction with the 
+//                HMI. This implements an MVC-style model for exchanging data
+//				  between the 4DIAC Service Interface Function Blocks and
+//                the user interface.
 //
 package HVACsim;
 
@@ -48,6 +52,7 @@ public class TCPserver implements Runnable {
 
 	String hostName = "";
 	int listenerPortNumber = 0;
+	EnvironmentUI ui;
 	int serverStatus = TCPserverExitCodes.UNDEFINED;
 	
 	// FIFO queue for packets
@@ -60,9 +65,10 @@ public class TCPserver implements Runnable {
 	// Provides the hostName and listener port number via the
 	// class constructor. This class implements Runnable.
 	//
-	public TCPserver(String hostName, int listenerPortNumber) {
+	public TCPserver(String hostName, int listenerPortNumber, EnvironmentUI ui) {
 		this.hostName = hostName;
 		this.listenerPortNumber = listenerPortNumber;
+		this.ui = ui;
 	}
 
 	//
@@ -102,6 +108,8 @@ public class TCPserver implements Runnable {
 	public int startServer(String hostName, int listenerPortNumber) throws Exception {
 		int serverStatus = TCPserverExitCodes.EXIT_SUCCESS;
 		int packetLength = 0;
+		String replyPacket = "";
+		int lastSetTemperature = 0;
 
 		if (hostName.equals("")) {
 			serverStatus = TCPserverExitCodes.INVALID_HOST_NAME;
@@ -121,8 +129,8 @@ public class TCPserver implements Runnable {
 			serverSocketChannel.bind(new InetSocketAddress(host, listenerPortNumber));
 			serverSocketChannel.register(selector,  SelectionKey.OP_ACCEPT);
 
-			// Ensure that after the channel has been opened, no channel
-			// is currently accepted.
+			// Ensure that after the channel has been opened, no channel is 
+			// marked as "accepted".
 			SelectionKey key = null;
 			serverStatus = TCPserverExitCodes.EXIT_SUCCESS;
 			//System.err.println("Server started..");
@@ -144,8 +152,8 @@ public class TCPserver implements Runnable {
 							SocketChannel sc = serverSocketChannel.accept();
 							// Set this to non-blocking mode.
 							sc.configureBlocking(false);
-							// Set the socket to reading mode.
-							sc.register(selector,  SelectionKey.OP_READ);
+							// Set the socket to read and write mode.
+							sc.register(selector,  SelectionKey.OP_READ | SelectionKey.OP_WRITE);
 							System.err.println("Connection accepted on local address " + sc.getLocalAddress() + "\n");
 						}
 
@@ -164,12 +172,38 @@ public class TCPserver implements Runnable {
 								// A null packet was received indicating
 								// that the server should close this
 								// session socket.
-								sc.close();
+								sc.close();								
 								System.err.println("Connection closed");
 							} else {
-								queuePacket(dataPacket);
+								System.out.println("[" + dataPacket + "]");
+								replyPacket = dataPacket.toUpperCase() + "\n";
+								
+								int temp = Integer.parseInt(dataPacket);
+								ui.showRoomTemperature(temp);
+								
+								if (key.isWritable()) {
+									if (replyPacket != "") {
+										System.out.println("--> [" + replyPacket + "]");
+										ByteBuffer byteBuffer2 = ByteBuffer.wrap(replyPacket.getBytes());
+										sc.write(byteBuffer2);
+										byteBuffer2.clear();
+										replyPacket = "";
+										
+										// <RA_BRD
+										temp = ui.getSetTemperature();
+										if (lastSetTemperature != temp) {
+											lastSetTemperature = temp;
+											replyPacket = "set temperature changed [" + lastSetTemperature + "]\n";
+											byteBuffer2 = ByteBuffer.wrap(replyPacket.getBytes());
+											sc.write(byteBuffer2);
+											byteBuffer2.clear();
+											replyPacket = "";
+										}
+										// <RA_BRD
+									}
+								}
 							}
-						}
+						}		
 					}
 				}
 				Thread.currentThread().yield();
