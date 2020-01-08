@@ -42,7 +42,7 @@ public class HVACsim {
 		
 		say("HVAC Simulator version " + appVersion + "\n");
 		// windowTop, windowLeft, windowWidth, windowHeight
-		ui = new EnvironmentUI("HVAC Simulator version " + appVersion, 200, 200, 800, 500);
+		ui = new EnvironmentUI("HVAC Simulator version " + appVersion, 0, 2000, 800, 500);
 		startServer("127.0.0.1", 62501, ui);
 	}	
 	

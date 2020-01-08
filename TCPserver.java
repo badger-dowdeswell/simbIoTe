@@ -110,6 +110,7 @@ public class TCPserver implements Runnable {
 		int packetLength = 0;
 		String replyPacket = "";
 		int lastSetTemperature = 0;
+		int setTemperature = 0;
 
 		if (hostName.equals("")) {
 			serverStatus = TCPserverExitCodes.INVALID_HOST_NAME;
@@ -176,11 +177,15 @@ public class TCPserver implements Runnable {
 								System.err.println("Connection closed");
 							} else {
 								System.out.println("[" + dataPacket + "]");
-								replyPacket = dataPacket.toUpperCase() + "\n";
-								
-								int temp = Integer.parseInt(dataPacket);
+								int temp = (int) Float.parseFloat(dataPacket);
 								ui.showRoomTemperature(temp);
 								
+								setTemperature = ui.getSetTemperature();
+								if (setTemperature != lastSetTemperature) {
+									lastSetTemperature = setTemperature;
+									replyPacket = "Set temperature changed " + setTemperature;
+								}	
+							
 								if (key.isWritable()) {
 									if (replyPacket != "") {
 										System.out.println("--> [" + replyPacket + "]");
@@ -188,21 +193,23 @@ public class TCPserver implements Runnable {
 										sc.write(byteBuffer2);
 										byteBuffer2.clear();
 										replyPacket = "";
-										
-										// <RA_BRD
-										temp = ui.getSetTemperature();
-										if (lastSetTemperature != temp) {
-											lastSetTemperature = temp;
-											replyPacket = "set temperature changed [" + lastSetTemperature + "]\n";
-											byteBuffer2 = ByteBuffer.wrap(replyPacket.getBytes());
-											sc.write(byteBuffer2);
-											byteBuffer2.clear();
-											replyPacket = "";
-										}
-										// <RA_BRD
 									}
 								}
-							}
+							}	
+							//			// <RA_BRD
+							//			temp = ui.getSetTemperature();
+							//			if (lastSetTemperature != temp) {
+							//				lastSetTemperature = temp;
+							//				replyPacket = "set temperature changed [" + lastSetTemperature + "]\n";
+							//				byteBuffer2 = ByteBuffer.wrap(replyPacket.getBytes());
+							//				sc.write(byteBuffer2);
+							//				byteBuffer2.clear();
+							//				replyPacket = "";
+							//			}
+							//			// <RA_BRD
+							//		}
+							
+							//}
 						}		
 					}
 				}
@@ -336,4 +343,3 @@ public class TCPserver implements Runnable {
 		return this.listenerPortNumber;
 	}
 }	
-
