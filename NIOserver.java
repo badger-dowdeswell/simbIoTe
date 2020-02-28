@@ -26,7 +26,6 @@
 // queue. Each entry contains the data sent in one packet by the client. The 
 // organisation of the fields in the packet is documented in
 //
-//
 // Revision History
 // ================
 // 18.12.2019 BRD Original version based on the Fault Diagnostic Engine (FDE)
@@ -38,8 +37,11 @@
 // 08.01.2020 BRD Brought naming conventions in-line with the matching C++ 
 //				  server and client components written for the FORTE function 
 //				  block applications.
+// 21.01.2020 BRD Migrated the simulator event processing into the Environment class.
+//				  Fixed issue with FORTE clients that triggers an exception when 
+//				  they disconnect.
 //
-package HVACsim; // <-RA_BRD: Package needs to become generic so it can be moved into a production library.
+package HVACsim; 
 
 import java.net.*;
 import java.nio.ByteBuffer;
@@ -50,9 +52,10 @@ import HVACsim.NIOstatus;
 import HVACsim.NIOpacket;
 
 public class NIOserver implements Runnable {
-	//
-	// Define the default input buffer size to read TCP
-	// data into.
+	// Flag to silence the status messages written to the console.
+	private static boolean isSilent = true;
+	
+	// Define the default input buffer size to read IP data into.
 	final static int BUFFER_SIZE = 1024;
 
 	// Data packet field separators. Please ensure
@@ -64,7 +67,9 @@ public class NIOserver implements Runnable {
 
 	String hostName = "";
 	int listenerPort = 0;
-	HMIui ui;
+	
+	Environment envr;
+		
 	int serverStatus = NIOstatus.UNDEFINED;
 	
 	// FIFO queue for packets
@@ -78,10 +83,26 @@ public class NIOserver implements Runnable {
 	// class constructor. This class implements Runnable so that
 	// it can operate on its own thread.
 	//
-	public NIOserver(String hostName, int listenerPort, HMIui ui) {
+	// hostName				Fully-qualified network URL for this server
+	//						instance that non-blocking clients can connect
+	//						to. Either a name such as "localhost" or an
+	//						IP address such as "127.0.0.1".
+	//
+	// listenerPort			The socket port that the server will listen on
+	//						for incoming connections. This is a handover
+	//						type socket. Once a client connects, the server
+	//						will hand over the connection to an individual
+	//						session socket that will manage the traffic for
+	//						that client for the duration of the session.
+	//
+	// envr					Pointer to the Environment instance that this 
+	//						server will route commands and data to for further
+	//						processing. 
+	//
+	public NIOserver(String hostName, int listenerPort, Environment envr) {
 		this.hostName = hostName;
 		this.listenerPort = listenerPort;
-		this.ui = ui;
+		this.envr = envr;
 	}
 
 	//
@@ -98,14 +119,12 @@ public class NIOserver implements Runnable {
 	// This returns an integer status code from NIOstatusCodes.
 	//
 	public void run() {
-		System.err.println("Server started on thread" + "\n"); //RA_BRD
+		say("NIOserver starting ...\n"); 
 		try {
 			startServer(hostName, listenerPort);
 		} catch (Exception e) {
-			System.out.println("Server Exception caught on host " + hostName + " while trying to listen on port " + listenerPort + ":" ); //RA_BRD
-			System.out.println(e.getMessage()); //RA_BRD
+			say("NIOserver exception caught on host " + hostName + " while starting server on listener port " + listenerPort + ". " + e.getMessage()); 
 			serverStatus = NIOstatus.EXIT_FAILURE;
-			e.printStackTrace();
 		}
 	}
 
@@ -129,7 +148,9 @@ public class NIOserver implements Runnable {
 	//						session socket that will manage the traffic for
 	//						that client for the duration of the session.
 	//
-	// returns				One of the NIOstatus status codes.
+	// returns				One of the NIOstatus status codes. Note that
+	//						this function never exits unless it is shut
+	//                      down or there is a problem.
 	//
 	@SuppressWarnings("static-access")
 	public int startServer(String hostName, int listenerPort) throws Exception {
@@ -142,10 +163,6 @@ public class NIOserver implements Runnable {
 		String responsePacket = "";
 		String command = "";	
 		
-		// RA_BRD Part of unit test to be moved into a proper test regime.
-		// queuePacket("junk");
-		// RA_BRD
-
 		if (hostName.equals("")) {
 			serverStatus = NIOstatus.INVALID_HOST_NAME;
 		} else if (listenerPort <= 0) {
@@ -166,11 +183,11 @@ public class NIOserver implements Runnable {
 			// marked as "accepted".
 			SelectionKey key = null;
 			serverStatus = NIOstatus.EXIT_SUCCESS;
-			//System.err.println("Server started.."); // RA_BRD
 
 			// This section manages all the traffic across multiple client
 			// connections.
 			while (true) {
+				
 				if (selector.select() > 0) {
 					Set<SelectionKey> selectedKeys = selector.selectedKeys();
 					Iterator<SelectionKey> iterator = selectedKeys.iterator();
@@ -188,7 +205,7 @@ public class NIOserver implements Runnable {
 							sc.configureBlocking(false);
 							// Set the socket to read and write mode.
 							sc.register(selector,  SelectionKey.OP_READ | SelectionKey.OP_WRITE);
-							System.err.println("Connection accepted on local address " + sc.getLocalAddress() + "\n");
+							say("Connection accepted on local address " + sc.getLocalAddress() + "\n");
 						}
 
 						if (key.isReadable()) {
@@ -199,81 +216,53 @@ public class NIOserver implements Runnable {
 							// buffer.
 							SocketChannel sc = (SocketChannel) key.channel();
 							ByteBuffer byteBuffer = ByteBuffer.allocate(BUFFER_SIZE);
-							sc.read(byteBuffer);
-							String dataPacket = new String (byteBuffer.array()).trim();
-							packetLength = dataPacket.length();
-							if (packetLength <= 0 ) {
-								// A null packet was received indicating
-								// that the server should close this
-								// session socket.
-								sc.close();								
-								System.err.println("Connection closed");
-							} else {
-								//System.out.println("[" + dataPacket + "]");
-								
-								// RA_BRD Interesting way of uniquely identifying this socket amongst the connections.
-								// Perhaps we could run separate FIFO queues for each socket based on this identifier?
-								System.out.println("socket identifier " + key.hashCode());								
-								queuePacket(dataPacket);
-								
-								while (getQueueSize() > 0) {
-									packet = getPacket();
-									System.out.println(packet.command() + " " + packet.commandData());
-									responsePacket = ui.externalEventHandler(packet.command(), packet.commandData()); 
-									if (responsePacket.length() > 0) {
-										System.out.println("Response packet [" + responsePacket + "]");
-										if (key.isWritable()) {											
-											ByteBuffer byteBuffer2 = ByteBuffer.wrap(responsePacket.getBytes());
-											sc.write(byteBuffer2);
-											byteBuffer2.clear();
-											replyPacket = "";
-										}
-									}
-								}
+							
+							try {
+								sc.read(byteBuffer);
+							} catch (Exception e) {
+								say("NIOserver Exception caught on host " + hostName + " while trying to read from port " + listenerPort + ". " + e.getMessage());
+								sc.close();
 							}
 								
-							//	responsePacket = ui.externalEventHandler(String command, String commandData); 
+							if (sc.isConnected()) {
+								String dataPacket = new String (byteBuffer.array()).trim();
+								packetLength = dataPacket.length();
+								if (packetLength <= 0 ) {
+									// A null packet was received indicating that the server should close this
+									// session socket.
+									sc.close();								
+									say("Connection closed");
+								} else {
+									//System.out.println("[" + dataPacket + "]");
 								
-						//		int temp = (int) Float.parseFloat(dataPacket);
-						//		ui.showRoomTemperature(temp);
+									// RA_BRD Interesting way of uniquely identifying this socket amongst the connections.
+									// Perhaps we could run separate FIFO queues for each socket based on this identifier?
+									// System.out.println("socket identifier " + key.hashCode());								
+									queuePacket(dataPacket);
+									
+									while (getQueueSize() > 0) {
+										packet = getPacket();
+										responsePacket = envr.externalEventHandler(packet.command(), packet.commandData());
+										if (responsePacket.length() > 0) {
+											say("Response packet [" + responsePacket + "]");
+											if (key.isWritable()) {											
+												ByteBuffer byteBuffer2 = ByteBuffer.wrap(responsePacket.getBytes());
+												sc.write(byteBuffer2);
+												byteBuffer2.clear();
+												replyPacket = "";
+											}
+										}
+									}
+								}	
+							}
 								
-						//		setTemperature = ui.getSetTemperature();
-						//		if (setTemperature != lastSetTemperature) {
-						//			lastSetTemperature = setTemperature;
-						//			replyPacket = "Set temperature changed " + setTemperature;
-						//		}	
-							
-							//	if (responsePacket != "") {
-							//		if (key.isWritable()) {
-							//			System.out.println("--> [" + responsePacket + "]");
-							//			ByteBuffer byteBuffer2 = ByteBuffer.wrap(responsePacket.getBytes());
-							//			sc.write(byteBuffer2);
-							//			byteBuffer2.clear();
-							//			replyPacket = "";
-							//		}
-							//	}
-							//}	
-							//			// <RA_BRD
-							//			temp = ui.getSetTemperature();
-							//			if (lastSetTemperature != temp) {
-							//				lastSetTemperature = temp;
-							//				replyPacket = "set temperature changed [" + lastSetTemperature + "]\n";
-							//				byteBuffer2 = ByteBuffer.wrap(replyPacket.getBytes());
-							//				sc.write(byteBuffer2);
-							//				byteBuffer2.clear();
-							//				replyPacket = "";
-							//			}
-							//			// <RA_BRD
-							//		}
-							
-							//}
-						}		
-					}
+						}
+					}	
 				}
 				Thread.currentThread().yield();
 			}
 		}
-		System.err.println("Jumped out of the server loop");
+		say("NIOserver jumped out of the server loop");
 		return serverStatus;
 	}
 
@@ -298,21 +287,6 @@ public class NIOserver implements Runnable {
 	//   End of packet character - currently &
 	//
 	private void queuePacket(String dataPacket) {
-		
-		// <-RA_BRD convert this into a proper unit test later.
-//		dataPacket = "erty" + START_OF_PACKET + END_OF_PACKET 
-//					 + START_OF_PACKET + "RS" + FIELD_SEPARATOR + "here_be_data" + FIELD_SEPARATOR + END_OF_PACKET 
-//					 + END_OF_PACKET 
-//					 + END_OF_PACKET
-//					 + "junk" + START_OF_PACKET + "VS" + FIELD_SEPARATOR + "here_be_data more" + FIELD_SEPARATOR + END_OF_PACKET
-//				     + "BC" + FIELD_SEPARATOR + FIELD_SEPARATOR +  FIELD_SEPARATOR + END_OF_PACKET
-//				     + START_OF_PACKET + FIELD_SEPARATOR + "here_be_bad data" + FIELD_SEPARATOR + END_OF_PACKET 
-//				     + START_OF_PACKET + "LP" + FIELD_SEPARATOR + "here_be_the_last_good_data" + FIELD_SEPARATOR + END_OF_PACKET
-//				     + "junk" + START_OF_PACKET + "GZ1" + FIELD_SEPARATOR + " " + FIELD_SEPARATOR + END_OF_PACKET 
-//					 + START_OF_PACKET + "LAST LONG SPACED-OUT COMMAND" + FIELD_SEPARATOR + "REALLY THE LAST PACKET" + FIELD_SEPARATOR + END_OF_PACKET 
-//					 + "badddd junk";
-		// JUnit test for data packets.
-				
 		int ptrStart = 0;
 		int ptrEnd = 0;
 		int ptrFieldStart = 0;
@@ -323,7 +297,7 @@ public class NIOserver implements Runnable {
 		String command = "";
 		String commandData = "";
 
-		System.out.println(dataPacket + "  [" + packetLen + "]\n");	// <--RA_BRD
+		say("Entire data packet received [" + dataPacket + "]  length = " + packetLen + "\n");	
 
 		if (packetLen > 0) {
 			ptrStart = -1;
@@ -339,12 +313,12 @@ public class NIOserver implements Runnable {
 					ptrEnd = dataPacket.indexOf(END_OF_PACKET, ptrStart);
 					if (ptrEnd == -1) {
 						// There is no end of packet marker so either we have an incomplete buffer 
-						// or lots of junk. At present, assume junk.. RA_BRD need to buffer this better.
+						// or lots of junk. At present, assume junk. 
+						// RA_BRD - Review this after more testing.
 						break;
 					} else {
 						message = dataPacket.substring(ptrStart, ptrEnd + 1);
-						
-						System.out.println("[" + message + "]");
+						say("Found message [" + message + "]");
 						command = "";
 						commandData = "";
 						ptrFieldStart = 1;
@@ -356,15 +330,14 @@ public class NIOserver implements Runnable {
 								ptrFieldEnd = message.indexOf(FIELD_SEPARATOR, ptrFieldStart + 1);
 								if (ptrFieldEnd > 0) {
 									commandData = message.substring(ptrFieldStart + 1, ptrFieldEnd);
-								
-									System.out.println("-- message [" + command + "] [" + commandData + "]");
+									say("-- message [" + command + "] [" + commandData + "]");
 									NIOpacket packet = new NIOpacket();	
 									packet.command(command);
 									packet.commandData(commandData);
 									FIFOqueue.add(packet);
 								}	
 							} else {
-								System.err.println("Missing command field in current packet."); // <-RA_BRD
+								say("Missing command field in current packet."); 
 							}
 						}	
 						ptrStart = ptrEnd;
@@ -375,16 +348,6 @@ public class NIOserver implements Runnable {
 				}	
 			}
 		}
-		
-		// RA_BRD convert this to a proper Unit Test later.
-//		System.out.println("Queue size = " + getQueueSize());
-//		NIOpacket packet = new NIOpacket();
-//		while (getQueueSize() > 0) {
-//			packet = getPacket();
-//			System.out.println(packet.command() + " " + packet.commandData());
-//		}
-//		System.out.println("");
-		// RA_BRD
 	}
 					
 	//
@@ -399,14 +362,11 @@ public class NIOserver implements Runnable {
 	public NIOpacket getPacket() {		
 		NIOpacket packet = new NIOpacket();
 		boolean found = false;
-		String SIFBinstanceID = "";
 		String dataPacket = "";
 		
 		if (FIFOqueue.size() > 0) {
 			packet = FIFOqueue.poll();
-			// System.err.println("getPacket()- " + packet.SIFBinstanceID + " [" + packet.dataPacket + "]");
-		//	SIFBinstanceID = packet.getSIFBinstanceID();
-		//	dataPacket = packet.dataPacket;
+			say("getPacket()- [" + packet.command() + "] [" + packet.commandData() + "]");
 			found = true;
 		}	
 		return packet;
@@ -421,8 +381,48 @@ public class NIOserver implements Runnable {
 	
 	//
 	// get listenerPort
-	// ======================
+	// ================
 	public int listenerPort() {
 		return this.listenerPort;
 	}
+	
+	//
+	// say()
+	// =====
+	// Output a console message for use during debugging. This
+	// can be turned off by setting the private boolean variable 
+	// isSilent true.
+	//
+	private static void say(String whatToSay){
+		if(!isSilent) {
+			System.err.println(whatToSay);
+		}
+	}	
 }	
+
+//
+// Resources for Unit Tests
+// ========================
+// 
+// 	RA_BRD convert this to a proper Unit Test later.
+//	System.out.println("Queue size = " + getQueueSize());
+//	NIOpacket packet = new NIOpacket();
+//	while (getQueueSize() > 0) {
+//		packet = getPacket();
+//		System.out.println(packet.command() + " " + packet.commandData());
+//	}
+//
+// <-RA_BRD convert this into a proper unit test later.
+//			dataPacket = "erty" + START_OF_PACKET + END_OF_PACKET 
+//			 + START_OF_PACKET + "RS" + FIELD_SEPARATOR + "here_be_data" + FIELD_SEPARATOR + END_OF_PACKET 
+//			 + END_OF_PACKET 
+//			 + END_OF_PACKET
+//			 + "junk" + START_OF_PACKET + "VS" + FIELD_SEPARATOR + "here_be_data more" + FIELD_SEPARATOR + END_OF_PACKET
+//		     + "BC" + FIELD_SEPARATOR + FIELD_SEPARATOR +  FIELD_SEPARATOR + END_OF_PACKET
+//		     + START_OF_PACKET + FIELD_SEPARATOR + "here_be_bad data" + FIELD_SEPARATOR + END_OF_PACKET 
+//		     + START_OF_PACKET + "LP" + FIELD_SEPARATOR + "here_be_the_last_good_data" + FIELD_SEPARATOR + END_OF_PACKET
+//		     + "junk" + START_OF_PACKET + "GZ1" + FIELD_SEPARATOR + " " + FIELD_SEPARATOR + END_OF_PACKET 
+//			 + START_OF_PACKET + "LAST LONG SPACED-OUT COMMAND" + FIELD_SEPARATOR + "REALLY THE LAST PACKET" + FIELD_SEPARATOR + END_OF_PACKET 
+//			 + "badddd junk";
+// JUnit test for data packets.
+

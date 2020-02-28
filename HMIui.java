@@ -15,6 +15,13 @@
 // 				  data between the 4DIAC function blocks and this HMI.
 // 08.01.2020 BRD Implemented event handlers that allows the server to
 //				  exchange data with the HMI UI.
+// 20.01.2020 BRD The external event handler has been moved into the
+//                environment object - it makes more sense to put it 
+//				  there. Now, the function blocks talk to the server,
+//				  then the server talks to the environment, which
+//				  updates the HMI. Switch presses are now buffered
+//				  in the HMI until the Environment asks for them.
+//				  Yay for Observer Patterns !!!
 //
 package HVACsim;
 import java.awt.*;
@@ -25,6 +32,8 @@ import java.lang.Math.*;
 
 public class HMIui extends JFrame{
 	private static final long serialVersionUID = 1L;
+	
+	//private Environment envr = new Environment();
 	
 	// The path to the directory where the graphics images can
 	// be loaded from. <-RA_BRD can we load this dynamically
@@ -53,19 +62,24 @@ public class HMIui extends JFrame{
 	JButton cmdSetUp = new JButton("");
 	JButton cmdSetDown = new JButton("");
 	
-	int Zone1temperature = 15;
-	int Zone2temperature = 10;
-	int Zone3temperature = 15;
+	int cmdSetUpCounter = 0;
+	int cmdSetDownCounter = 0;
 	
-	int Zone1setTemperature = 10;
-	int Zone2setTemperature = 10;
-	int Zone3setTemperature = 10;
+	int Zone1temperature = 15;
+//	int Zone2temperature = 10;
+//	int Zone3temperature = 15;
+	
+	int Zone1setTemperature = 0;
+	int Zone2setTemperature = 0;
+	int Zone3setTemperature = 0;
 	
 	public JLabel digitSet1 = new JLabel();
 	public JLabel digitSet2 = new JLabel();
 	public JLabel digitSet3 = new JLabel();
 	
 	JLabel labelZone1 = new JLabel();
+	JLabel labelZone2 = new JLabel();
+	JLabel labelZone3 = new JLabel();
 	
 	//
 	// HMI DEFINITION
@@ -74,6 +88,9 @@ public class HMIui extends JFrame{
 	// the windows JFrame.
 	//
 	// title         The window title.
+	//
+	// envr			 The Environment defined previously for this simulation. This is usually
+	//               accessed in the externalEventHandler() method. RA_BRD - deprecated
 	//
 	// windowTop     Vertical coordinate of the top left corner of the window relative to the 
 	//				 desktop window.
@@ -87,6 +104,8 @@ public class HMIui extends JFrame{
 	// windowHeight  Default height of the window. Also resized automatically by the JPanel.
 	//
 	public HMIui(String title, int windowTop, int windowLeft, int windowWidth, int windowHeight)  {
+		//this.envr = envr; RA_BRD
+				
 		// Create and layout the components using a Swing GridBagLayout. All components are laid out
 		// on top of a JPanel called layoutPanel. This panel gets resized automatically as controls 
 		// are laid out on it. Finally, the layout panel will be added to the JFrame that will get 
@@ -113,9 +132,9 @@ public class HMIui extends JFrame{
 		//
 		
 		//
-		// RIGHT LAYERED PANE 1,0  (NEW LEFT)
-		// ======================
-		// Displays a zone controller panel. 
+		// LEFT LAYERED PANE
+		// =================
+		// Displays a view of the building in grid zone 0,0. 
 		//
 		layeredPane = new JLayeredPane();
 		
@@ -168,12 +187,12 @@ public class HMIui extends JFrame{
 		digitSet3 = new JLabel();
 		digitSet3.setIcon(imageIcon);
 		digitSet3.setBounds(205, 90, imageIcon.getIconWidth(), imageIcon.getIconHeight());
-		layeredPane.add(digitSet3, LAYER_1, DEPTH); showSetTemperature(Zone1setTemperature);
+		layeredPane.add(digitSet3, LAYER_1, DEPTH); showSetTemperature(1, Zone1setTemperature);
 	
 		digitSet2 = new JLabel();
 		digitSet2.setIcon(imageIcon);
 		digitSet2.setBounds(235, 90, imageIcon.getIconWidth(), imageIcon.getIconHeight());
-		layeredPane.add(digitSet2, LAYER_1, DEPTH); showSetTemperature(Zone1setTemperature);
+		layeredPane.add(digitSet2, LAYER_1, DEPTH); showSetTemperature(1, Zone1setTemperature);
 		
 		digitSet1 = new JLabel();
 		digitSet1.setIcon(imageIcon);
@@ -210,91 +229,6 @@ public class HMIui extends JFrame{
 		constraints.anchor = GridBagConstraints.LINE_END;
 		constraints.fill = GridBagConstraints.NONE;
 		layeredPane.add(cmdSetDown, LAYER_1, DEPTH); //, 1);
-	
-		// Display the room selection buttons.
-	//	JButton cmdZone1 = new JButton("");
-	//	icon = new ImageIcon(graphicsPath + "cmdZone1.png");
-	//	cmdZone1.setIcon(icon);		
-	//	//cmdZone1.setBorder(BorderFactory.createEmptyBorder());
-	//	cmdZone1.setFocusPainted(true);
-	//	cmdZone1.setBounds(60, 180, icon.getIconWidth(), icon.getIconHeight());
-	//	cmdZone1.addActionListener(new ActionListener() {
-	//		@Override
-	//		//
-	//		// cmdZone1_Click()
-//			// ================
-//			public void actionPerformed(ActionEvent event) {
-//				// TODO Auto-generated method stub
-//				// <RA_BRD tidy up later - this saves a lot of time at the moment.
-//				System.out.println("Clicked Zone 1.");
-//				showRoomTemperature(Zone1temperature); 
-//			}
-//		});
-//		
-//		constraints.gridx = 1; 
-//		constraints.gridy = 1;  
-//		constraints.ipadx = 0;
-//		constraints.ipady = 0;
-//		constraints.insets = new Insets(10,10,10,10);
-//		constraints.anchor = GridBagConstraints.LINE_END;
-//		constraints.fill = GridBagConstraints.NONE;
-//		layeredPane.add(cmdZone1, LAYER_1, DEPTH); //, 1);
-//		
-//		JButton cmdZone2 = new JButton("");
-//		icon = new ImageIcon(graphicsPath + "cmdZone2.png");
-//		cmdZone2.setIcon(icon);
-//		//cmdZone1.setBorder(BorderFactory.createEmptyBorder());
-//		cmdZone2.setFocusPainted(true);
-//		cmdZone2.setBounds(160, 180, icon.getIconWidth(), icon.getIconHeight());
-//		cmdZone2.addActionListener(new ActionListener() {
-//			@Override
-//			//
-//			// cmdZone2_Click()
-//			// ================
-//			public void actionPerformed(ActionEvent event) {
-//				// TODO Auto-generated method stub
-//				// <RA_BRD tidy up later - this saves a lot of time at the moment.
-//				System.out.println("Clicked Zone 2.");
-//				showRoomTemperature(Zone2temperature); 
-//			}
-//		});
-//		
-//		constraints.gridx = 1;  
-//		constraints.gridy = 1;  
-//		constraints.ipadx = 0;
-//		constraints.ipady = 0;
-//		constraints.insets = new Insets(10,10,10,10);
-//		constraints.anchor = GridBagConstraints.LINE_END;
-//		constraints.fill = GridBagConstraints.NONE;
-//		layeredPane.add(cmdZone2, LAYER_1, DEPTH); //, 1);
-//		
-//		JButton cmdZone3 = new JButton("");
-//		icon = new ImageIcon(graphicsPath + "cmdZone3.png");
-//		cmdZone3.setIcon(icon);
-//		//cmdZone1.setBorder(BorderFactory.createEmptyBorder());
-//		cmdZone3.setFocusPainted(true);
-//		cmdZone3.setBounds(258, 180, icon.getIconWidth(), icon.getIconHeight());
-//		cmdZone3.addActionListener(new ActionListener() {
-//			@Override
-//			//
-//			// cmdZone3_Click()
-//			// ================
-//			public void actionPerformed(ActionEvent event) {
-//				// TODO Auto-generated method stub
-//				// <RA_BRD tidy up later - this saves a lot of time at the moment.
-//				System.out.println("Clicked Zone 3.");
-//				showRoomTemperature(Zone3temperature); 
-//			}
-//		});
-//		
-//		constraints.gridx = 1;  
-//		constraints.gridy = 1;  
-//		constraints.ipadx = 0;
-//		constraints.ipady = 0;
-//		constraints.insets = new Insets(10,10,10,10);
-//		constraints.anchor = GridBagConstraints.LINE_END;
-//		constraints.fill = GridBagConstraints.NONE;
-//		layeredPane.add(cmdZone3, LAYER_1, DEPTH); //, 1);
 		
 		// Setup the constraints for the layeredPane to be applied when
 		// it is added to the master or base layoutPanel.		
@@ -308,12 +242,13 @@ public class HMIui extends JFrame{
 		layoutPanel.add(layeredPane, constraints);
 	
 		//	
-		// LEFT LAYERED PANE 0,0 NEW RIGHT
-		// =====================
+		// RIGHT LAYERED PANE 
+		// ==================
+		// Displays the controller for Zone 1 in grid position 1,0
 		layeredPane = new JLayeredPane();
 		
 		// Display the background image on the base layer using a JLabel.
-		icon = new ImageIcon(graphicsPath + "smallRoomLayout4.png");   // was 3
+		icon = new ImageIcon(graphicsPath + "smallRoomLayout.png");   
 		label = new JLabel();
 		label.setIcon(icon);
 		label.setBounds(0, 0, icon.getIconWidth(), icon.getIconHeight());
@@ -322,19 +257,19 @@ public class HMIui extends JFrame{
 		
 		// Display static labels on layer one, just above the base layer.
 		//JLabel labelZone1 = new JLabel();
-		labelZone1.setText(Zone1temperature + "\u00B0");
-		labelZone1.setBounds(670, 200, 100, 100);
-		layeredPane.add(labelZone1, LAYER_1, DEPTH); 	
+	//	labelZone1.setText(envr.Zone1temperature() + "\u00B0");    // RA_BRD
+	//	labelZone1.setBounds(600, 150, 100, 100);
+	//	layeredPane.add(labelZone1, LAYER_1, DEPTH); 	
 		
-		JLabel labelZone2 = new JLabel();
-		labelZone2.setText(Zone2temperature + "\u00B0");
-		labelZone2.setBounds(610, 355, 100, 100);
-		layeredPane.add(labelZone2, LAYER_1, DEPTH); //, 1);
+	//	labelZone2.setText(envr.Zone1temperature() + "\u00B0");  // RA_BRD
+	//	labelZone2.setBounds(610, 355, 100, 100);
+	//	layeredPane.add(labelZone2, LAYER_1, DEPTH); 
 		
-	//	JLabel labelZone3 = new JLabel();
-	//	labelZone3.setText(Zone3temperature + "\u00B0");
-	//	labelZone3.setBounds(559, 325, 100, 100);
-	//	layeredPane.add(labelZone3, LAYER_1, DEPTH); //, 1);	
+		labelZone3.setText(Zone1temperature + "\u00B0");
+		labelZone3.setBounds(10, 200, 100, 100);
+		
+	//	labelZone3.setBounds(200, 150, 100, 100);
+		layeredPane.add(labelZone3, LAYER_1, DEPTH); 	
 	
 		// Setup the constraints for the layeredPane to be applied when
 		// it is added to the foundation layoutPanel.
@@ -352,38 +287,39 @@ public class HMIui extends JFrame{
 		//
 		// BOTTOM LAYERED PANE 1,1
 		// =======================
-		// Command button
-		JButton cmdButton = new JButton("OK");
-		cmdButton.setBounds(100, 100, 50, 20);
-		cmdButton.addActionListener(new ActionListener() {
-			@Override
-			//
-			// cmdButton_Click()
-			// =================
-			public void actionPerformed(ActionEvent event) {
-				// TODO Auto-generated method stub
-				// <RA_BRD tidy up later - this saves a lot of time at the moment.
-			//	temp = temp + 1;
-			//	System.out.println("Temperature = " + temp);				
-			//	showRoomTemperature(temp); 
-				// System.exit(0);
-			}
-		});
-		
-		constraints.gridx = 1;   
-		constraints.gridy = 1;  
-		constraints.ipadx = 50;
-		constraints.ipady = 10;
-		constraints.insets = new Insets(10,10,10,10);
-		constraints.anchor = GridBagConstraints.LINE_END;
-		constraints.fill = GridBagConstraints.NONE;
-		layoutPanel.add(cmdButton, constraints);
+		// RA_BRD Command button - not used at the moment and will probably be removed.
+		//
+//		JButton cmdButton = new JButton("OK");
+//		cmdButton.setBounds(100, 100, 50, 20);
+//		cmdButton.addActionListener(new ActionListener() {
+//			@Override
+//			//
+//			// cmdButton_Click()
+//			// =================
+//			public void actionPerformed(ActionEvent event) {
+//				// TODO Auto-generated method stub
+//				// <RA_BRD tidy up later - this saves a lot of time at the moment.
+//			//	temp = temp + 1;
+//			//	System.out.println("Temperature = " + temp);				
+//			//	showRoomTemperature(temp); 
+//				// System.exit(0);
+//			}
+//		});
+//		
+//		constraints.gridx = 1;   
+//		constraints.gridy = 1;  
+//		constraints.ipadx = 50;
+//		constraints.ipady = 10;
+//		constraints.insets = new Insets(10,10,10,10);
+//		constraints.anchor = GridBagConstraints.LINE_END;
+//		constraints.fill = GridBagConstraints.NONE;
+//		layoutPanel.add(cmdButton, constraints);
 		
 		//
 		// WINDOW CREATION
 		// ===============
 		// Finally, set the main window properties and display it after
-		// dynamically resizing the window to fit around the JPanel.
+		// dynamically resizing the window to fit around the base JPanel.
 		//
 		defineHMIEvents();
 		setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -395,9 +331,6 @@ public class HMIui extends JFrame{
 		this.setLocation(windowLeft, windowTop);
 		this.setResizable(true);
 		
-		showSetTemperature(Zone1setTemperature);
-		showRoomTemperature(Zone1temperature);
-;	
 		// Resize the window to fit the layout panel perfectly.
 		this.getContentPane().setSize(new Dimension(layoutPanel.getSize())); 
 		this.pack();
@@ -414,77 +347,78 @@ public class HMIui extends JFrame{
 		//
 		// cmdSetUp_Click()
 		// ================
+		// See also the companion function cmdUpClicked() 
+		//
 		cmdSetUp.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent event) {
-				Zone1setTemperature++;
-				//showSetTemperature(Zone1setTemperature);
+				cmdSetUpCounter++;
 			}
 		});
 		
 		//
 		// cmdSetDown_Click()
 		// ==================
+		// See also the companion function cmdDownClicked() 
+		// 
 		cmdSetDown.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent event) {
-				Zone1setTemperature--;
-				//showSetTemperature(Zone1setTemperature);
+				cmdSetDownCounter++;
 			}
 		});
 	}
 	
 	//
-	// EXTERNAL EVENT HANDLER
-	// ======================
-	// The HMI receives requests for data and updates from the external systems 
-	// it is connected to via the server session clients. This event handler
-	// is customised to process the commands that have been defined for this
-	// particular system.
-	//
-	// command		Command received from the client. These must have been 
-	//              predefined for this particular simulation. E
-	//
-	// commandData  Data that has been supplied with the command. May be blank
-	//              if not needed for that particular command.
-	//
-	// returns      A response packet, usually a data value, appropriate to
-	//              the command received. Will be blank if no command response
-	//              is required.
-	//
-	public String externalEventHandler(String command, String commandData) {
-		String responsePacket = "";
-		int setTemperature = 0;
-		
-		switch (command) {
-		case "GZ1":
-			setTemperature = Integer.parseInt(commandData);
-			showRoomTemperature(setTemperature);
-			showSetTemperature(Zone1setTemperature);
-			responsePacket = "*GZ1|" + getSetTemperature() + "|&";   //Zone1temperature + "|&";
-			break;
-			
-		case "GZ2":
-			responsePacket = "*GZ2|" + Zone2temperature + "|&";
-			break;
-	
-		default:
-			System.out.print("Unrecognised command '" + command + "' with commandData '" + commandData + "'");
-			break;
-		}
-		return responsePacket;
-	}
-
-	//
 	// OTHER GENERAL-PURPOSE FUNCTIONS
 	// ===============================
 	// All other general-purpose functions are specified here.
 	//
+	// Public functions here are likely to be called by the 
+	// Environment when it is retrieving data from interactive
+	// controls for the simulation or updating the view.
+	//
+	
+	//
+	// cmdUpClicked()
+	// ==============
+	// Refer to the companion function cmdSetUp_Click() in defineHMIEvents() 
+	//
+	public boolean cmdUpClicked() {
+		if (cmdSetUpCounter > 0) {
+			cmdSetUpCounter = Math.max(--cmdSetUpCounter, 0);
+			return true;
+		} else {
+			return false;
+		}
+	}
+	
+	//
+	// cmdDownClicked()
+	// ================
+	// Refer to the companion function cmdSetDown_Click() in defineHMIEvents()
+	// 
+	public boolean cmdDownClicked() {
+		if (cmdSetDownCounter > 0) {
+			cmdSetDownCounter = Math.max(--cmdSetDownCounter, 0);
+			return true;
+		} else {
+			return false;
+		}
+	}
+	
+	//
 	// showRoomTemperature()
 	// =====================
-	// Displays a temperature on a three-digit LED panel
+	// Displays a temperature on a three-digit LED panel. 
 	//
-	public void showRoomTemperature(int displayTemperature) {
+	// zone                Zone the temperature applies to.
+	//
+	// displayTemperature. Temperature to display. Note that the room temperature 
+	//					   is stored in the environment as a float but the display 
+	//					   can only show whole numbers.
+	//
+	public void showRoomTemperature(int zone, int displayTemperature) {
 		int absTemperature = Math.abs(displayTemperature);
 		String temperature = "000" + Integer.toString(absTemperature);
 		temperature = temperature.substring(temperature.length() - 3);
@@ -492,10 +426,6 @@ public class HMIui extends JFrame{
 		Icon icon = new ImageIcon();
 		Icon iconBlank = new ImageIcon(graphicsPath + "digitLarge_Blank.png");
 		Icon iconMinus = new ImageIcon(graphicsPath + "digitLarge_Minus.png");
-		
-		// RA_BRD
-		Zone1temperature = displayTemperature;
-	//	labelZone1.setText(Zone1temperature + "\u00B0");
 		
 		icon = new ImageIcon(graphicsPath + "digitLarge_" + temperature.substring(2, 3) + ".png");
 		digitTemp1.setIcon(icon);
@@ -526,9 +456,15 @@ public class HMIui extends JFrame{
 	//
 	// showSetTemperature()
 	// ====================
-	// Displays the preset temperature on the small three-digit LED panel
+	// Displays the preset zone temperature on the small three-digit LED panel
 	//
-	public void showSetTemperature(int displayTemperature) {
+	// zone                Zone the temperature applies to.
+	//
+	// displayTemperature. Set temperature to display. Note that the set temperature 
+	//					   is stored in the environment as a float but the display 
+	//					   can only show whole numbers.
+	//
+	public void showSetTemperature(int zone, int displayTemperature) {
 		// The room set temperature digits are made from the same images as the
 		// room temperature ones but they are scaled dynamically.
 		final int HORIZONTAL_SCALE = 25;
@@ -543,12 +479,6 @@ public class HMIui extends JFrame{
 				                       .getImage().getScaledInstance(HORIZONTAL_SCALE, VERTICAL_SCALE, Image.SCALE_DEFAULT)); 
 		Icon iconMinus = new ImageIcon(new ImageIcon(graphicsPath + "digitLarge_Minus.png")
 				                       .getImage().getScaledInstance(HORIZONTAL_SCALE, VERTICAL_SCALE, Image.SCALE_DEFAULT));
-		
-		// <--RA_BRD Why are these images here? They are not used....
-	//	ImageIcon imageBlank = new ImageIcon(new ImageIcon(graphicsPath + "digitLarge_Blank.png")
-	//			                                           .getImage().getScaledInstance(HORIZONTAL_SCALE, VERTICAL_SCALE, Image.SCALE_DEFAULT)); 
-	//	ImageIcon imageMinus = new ImageIcon(new ImageIcon(graphicsPath + "digitLarge_Minus.png")
-	//			                                           .getImage().getScaledInstance(HORIZONTAL_SCALE, VERTICAL_SCALE, Image.SCALE_DEFAULT)); 
 		
 		icon = new ImageIcon(new ImageIcon(graphicsPath + "digitLarge_" + temperature.substring(2, 3) + ".png")
 				             .getImage().getScaledInstance(HORIZONTAL_SCALE, VERTICAL_SCALE, Image.SCALE_DEFAULT)); 
@@ -579,10 +509,54 @@ public class HMIui extends JFrame{
 		}	
 	}
 	
-	//
-	// getSetTemperature()
-	// ===================
-	public int getSetTemperature() {
-		return Zone1setTemperature;
-	}
-}
+
+}	
+
+// UNUSED CODE RA_BRD
+// ==================
+//	//
+//	// getSetTemperature()
+//	// ===================
+//	public int getSetTemperature() {
+//		return Zone1setTemperature;
+//	}
+//
+// EXTERNAL EVENT HANDLER
+// ======================
+// The HMI receives requests for data and updates from the external systems 
+// it is connected to via the server session clients. This event handler
+// is customised to process the commands that have been defined for this
+// particular system.
+//
+// command		Command received from the client. These must have been 
+//              predefined for this particular simulation. E
+//
+// commandData  Data that has been supplied with the command. May be blank
+//              if not needed for that particular command.
+//
+// returns      A response packet, usually a data value, appropriate to
+//              the command received. Will be blank if no command response
+//              is required.
+//
+//public String externalEventHandler(String command, String commandData) {
+//	String responsePacket = "";
+//	int setTemperature = 0;
+//	
+//	switch (command) {
+//	case "GZ1":
+//	//	setTemperature = Integer.parseInt(commandData);
+//	//	showRoomTemperature(setTemperature);
+//	//	showSetTemperature(Zone1setTemperature);
+//		responsePacket = "*GZ1|" + Zone1temperature + "|&";   //Zone1temperature + "|&";
+//		break;
+//		
+//	case "GZ2":
+////		responsePacket = "*GZ2|" + Zone2temperature + "|&";
+//		break;
+//
+//	default:
+//		System.out.print("Unrecognised command '" + command + "' with commandData '" + commandData + "'");
+//		break;
+//	}
+//	return responsePacket;
+//}

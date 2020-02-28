@@ -19,54 +19,57 @@
 // ================
 // 18.12.2019 BRD Original version
 // 19.01.2020 BRD Linked in new non-blocking network libraries.
+// 13.01.2020 BRD Crafted the new Environment section of the simulation.
 // 
 package HVACsim;
-
-import java.util.concurrent.TimeUnit;
 
 import javax.swing.SwingUtilities;
 
 public class HVACsim {
 	public static String appVersion = "1.1";
 	private static boolean isSilent = true;
-
+	
 	//
 	// main()
 	// ======
 	public static void main(String[] args) {
+		say("HVAC Simulator version " + appVersion + "\n");
 		SwingUtilities.invokeLater(new Runnable() {
 			public void run() {
-				createGUI();
+				createSimulation();
 			}
 		});
 	}
 	
 	//
-	// createGUI()
-	// ===========	
-	private static void createGUI() {
-		HMIui ui;
-		
+	// createSimulation()
+	// ==================	
+	private static void createSimulation() {
 		say("HVAC Simulator version " + appVersion + "\n");
+		//
 		// RA_BRD parameters are windowTop, windowLeft, windowWidth, windowHeight. 
 		//        Are these in the right (i.e. standard) order for the documented
 		//        AWT libraries? A lot of the functions seem to switch them around
 		//        inconsistently. Also, fix up magic numbers and since the HMI 
 		//		  automatically resized the window to fit the contents, do we need
 		//        the window height and width parameters?
-		ui = new HMIui("HVAC Simulator version " + appVersion, 0, 2000, 800, 500);
+		HMIui ui = new HMIui("HVAC Simulator version " + appVersion, 0, 2000, 800, 500); //0, 2000, 800, 500
+		
+		Environment envr = new Environment(ui);
+		new Thread(envr).start();
 		
 		// RA_BRD parameterise these properly from a configuration file.
-		startServer("127.0.0.1", 62501, ui);
+		startServer("127.0.0.1", 62501, envr);
 	}	
 	
 	//
 	// startServer()
 	// =============
-	private static void startServer(String hostName, int listenerPort, HMIui ui) {
-		NIOserver server = new NIOserver(hostName, listenerPort, ui);
+	// Creates and starts the non-blocking TCP/IP server.
+	//
+	private static void startServer(String hostName, int listenerPort, Environment envr) {
+		NIOserver server = new NIOserver(hostName, listenerPort, envr);
 		new Thread(server).start();
-		
 		// RA_BRD make sure the server starts properly and returns back a status.
 	}
 
@@ -79,22 +82,7 @@ public class HVACsim {
 	//
 	private static void say(String whatToSay){
 		if(!isSilent) {
-			System.err.println(whatToSay);
+			System.out.println(whatToSay);
 		}
 	}	
-	
-	//
-	// delay()
-	// =======
-	// Delays the execution of the program.
-	//
-	// delayTime Delay specified in seconds.
-	//
-	private static void delay(Long delayTime) {
-		try {
-			TimeUnit.SECONDS.sleep((long) delayTime);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}	
-	}
 }
