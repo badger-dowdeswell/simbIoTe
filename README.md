@@ -1,4 +1,4 @@
-![simbIoTe logo](
+![simbIoTe logo](graphics/simbIoTe.jpg)
 
 ## simbIoTe 
 
