@@ -2,7 +2,7 @@
 
 ## simbIoTe 
 
-simbIoTe is a general-purpose, open-source simulation environment. It can be used to create both responsive physical environments as well as Human-Machine-Interfaces (HMIs) to support developers while their IoT hardware and software is under development.
+simbIoTe is a general-purpose, open-source simulation environment, written in Java. It can be used to create both responsive physical environments as well as Human-Machine-Interfaces (HMIs) to support developers while their IoT hardware and software is under development.
 
 #
 
