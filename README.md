@@ -2,13 +2,10 @@
 
 ## simbIoTe 
 
-simbIoTe is a general-purpose, open-source simulation environment, written in Java. It can be used to create both responsive physical environments as well as Human-Machine-Interfaces (HMIs) to support developers while their IoT hardware and software is under development.
+simbIoTe is a general-purpose, open-source simulation environment. It can be used to create both responsive physical environments as well as Human-Machine-Interfaces (HMIs) to support developers while their IoT hardware and software is under development.
 
-#
+# Initial release (1st April, 2020)
 
-s simpler to program and 
-Heating, Ventilation and Air-Conditioning (HVAC) environment simulator for use with IEC 61499 Function Block HVAC controllers
+The first version of simbIoTe implemented a Heating, Ventilation and Air-Conditioning (HVAC) environment simulator. This supported co-simulation for an IEC 61499 Function Block HVAC controller that was being developed as part of my PhD research. 
 
-This is a Java application that creates a realistic simulation of a building. Using its own web server, it responds to requests from clients for the temperature at specific locations in the room. 
-
-Temperatures are calculated from heating and cooling actions applied to the room by the function block application.
+HVACsim implements a realistic simulation of a building. Using its own TCP/IP server, it responds to requests from the IEC 61499 client devices. HVACsim can be polled for the temperature at specific locations in the building. Temperatures are calculated from heating and cooling actions applied to the room by the function block application.
