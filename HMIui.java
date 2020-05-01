@@ -248,7 +248,7 @@ public class HMIui extends JFrame{
 		layeredPane = new JLayeredPane();
 		
 		// Display the background image on the base layer using a JLabel.
-		icon = new ImageIcon(graphicsPath + "smallRoomLayout.png");   
+		icon = new ImageIcon(graphicsPath + "smallRoomLayout2.png");   
 		label = new JLabel();
 		label.setIcon(icon);
 		label.setBounds(0, 0, icon.getIconWidth(), icon.getIconHeight());
@@ -266,7 +266,7 @@ public class HMIui extends JFrame{
 	//	layeredPane.add(labelZone2, LAYER_1, DEPTH); 
 		
 		labelZone3.setText(Zone1temperature + "\u00B0");
-		labelZone3.setBounds(10, 200, 100, 100);
+		labelZone3.setBounds(10, 118, 100, 100);
 		
 	//	labelZone3.setBounds(200, 150, 100, 100);
 		layeredPane.add(labelZone3, LAYER_1, DEPTH); 	

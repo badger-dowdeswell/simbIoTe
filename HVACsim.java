@@ -53,7 +53,7 @@ public class HVACsim {
 		//        inconsistently. Also, fix up magic numbers and since the HMI 
 		//		  automatically resized the window to fit the contents, do we need
 		//        the window height and width parameters?
-		HMIui ui = new HMIui("HVAC Simulator version " + appVersion, 0, 2000, 800, 500); //0, 2000, 800, 500
+		HMIui ui = new HMIui("simbIoTe HVAC Room Simulator", 0, 2000, 800, 500); //0, 2000, 800, 500
 		
 		Environment envr = new Environment(ui);
 		new Thread(envr).start();

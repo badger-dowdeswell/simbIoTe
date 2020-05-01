@@ -14,6 +14,7 @@
 //
 package HVACsim;
 
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.lang.Math;
 import java.text.DecimalFormat;
@@ -38,16 +39,18 @@ public class Environment implements Runnable {
 	//int Zone2temperature = 18;
 	//int Zone3temperature = 18;
 	
-	float Zone1temperature = (float) 15.3;
+	float Zone1temperature = (float) 14.3;
+	float savedZone1temperature = Zone1temperature;
 	float Zone2temperature = (float) 18.7;
 	float Zone3temperature = (float) 19.18;
+	
 	
 	long elapsedTime = System.currentTimeMillis() / 1000;
 	boolean temperatureIncrease = false;
 	
 	// Internal environment control
 	// ============================
-	private static boolean isSilent = true;
+	private static boolean isSilent = false;
 	private HMIui ui;
 	
 	public Environment(HMIui ui) {
@@ -68,6 +71,7 @@ public class Environment implements Runnable {
 		final int MIN_TEMP = -50;
 		int newTemperature = 0;
 		long newElapsedTime = 0;
+		int cycleCount = 0;
 		
 		DecimalFormat df = new DecimalFormat();
 		df.setMaximumFractionDigits(2);
@@ -79,12 +83,39 @@ public class Environment implements Runnable {
 			// RA_BRD BEWARE ! - this won't wrap around properly at midnight, Cinderella....
 			if ((newElapsedTime - elapsedTime) >= 2000) {
 				elapsedTime = newElapsedTime;
-				// Calculate a new random temperature
-				newTemperature = (int) (Math.random() * ((MAX_TEMP - MIN_TEMP) + 1 )) + MIN_TEMP;
-				Zone1temperature = Zone1temperature + ((float) newTemperature / 100);
-				Zone1temperature = Float.valueOf(df.format(Zone1temperature));
-				ui.labelZone3.setText(Zone1temperature + "\u00B0");
-				say("Zone 1 temperature " + Zone1temperature);
+				cycleCount++;
+				
+				if (cycleCount > 10) {
+					int min = 1;
+					int max = 10;
+					int value = 0;
+					Random r = new Random();
+					value = r.nextInt((max - min) + 1) + min;
+					if (value > 9) {
+						// Generate an outlier temperature spike
+						Zone1temperature = Zone1temperature + (float) 10.0;
+						ui.labelZone3.setText(Zone1temperature + "\u00B0");
+						say("Zone 1 temperature " + Zone1temperature);
+					} else {	
+						// Calculate a new random temperature
+						Zone1temperature = savedZone1temperature; 
+						newTemperature = (int) (Math.random() * ((MAX_TEMP - MIN_TEMP) + 1 )) + MIN_TEMP;
+						Zone1temperature = Zone1temperature + ((float) newTemperature / 100);
+						Zone1temperature = Float.valueOf(df.format(Zone1temperature));
+						ui.labelZone3.setText(Zone1temperature + "\u00B0");
+						say("Zone 1 temperature " + Zone1temperature);
+						savedZone1temperature = Zone1temperature;
+					}		
+				} else {	
+					// Calculate a new random temperature
+					Zone1temperature = savedZone1temperature; 
+					newTemperature = (int) (Math.random() * ((MAX_TEMP - MIN_TEMP) + 1 )) + MIN_TEMP;
+					Zone1temperature = Zone1temperature + ((float) newTemperature / 100);
+					Zone1temperature = Float.valueOf(df.format(Zone1temperature));
+					ui.labelZone3.setText(Zone1temperature + "\u00B0");
+					say("Zone 1 temperature " + Zone1temperature);
+					savedZone1temperature = Zone1temperature;
+				}
 			}	
 		
 			Thread.currentThread();
