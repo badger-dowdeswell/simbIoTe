@@ -8,6 +8,6 @@
 
 The first exploratory version of *simbIoTe* was use to build a Heating, Ventilation and Air-Conditioning (HVAC) environment simulator. This supported co-simulation for an IEC 61499 Function Block HVAC controller that was being developed as part of my PhD research. 
 
-![HVACsim](graphics/HVACsim_01.jpg)
+![HVACsim](HVACsim_01.jpg)
 
 HVACsim implements a realistic simulation of a building. Using its own TCP/IP server, it responds to requests from the IEC 61499 client devices. HVACsim can be polled for the temperature at specific locations in the building. Temperatures are calculated from heating and cooling actions applied to the room by the function block application.
