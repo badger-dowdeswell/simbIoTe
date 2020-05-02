@@ -10,7 +10,7 @@ The first exploratory version of *simbIoTe* was use to build a Heating, Ventilat
 
 ![HVACsim](HVACsim_01.jpg)
 
-HVACsim implements a realistic simulation of a building. Using its own TCP/IP server, it responds to requests from the IEC 61499 client devices. HVACsim can be polled for the temperature at specific locations in the building. Temperatures are calculated from heating and cooling actions applied to the room by the function block application.
+HVACsim implements a realistic simulation of a building. Using its own TCP/IP server, it responds to requests from the IEC 61499 client devices. HVACsim can be polled for the temperature at specific locations in the building. Temperatures are calculated from heating and cooling actions applied to the room by the function block application. The Room Panel also provides clickable buttons to change the desired room temperature which communicate with the IEC 61499 application.
 
 ## Current development (1st May 2020)
 
