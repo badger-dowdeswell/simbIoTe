@@ -14,7 +14,7 @@ HVACsim implements a realistic simulation of a building. Using its own TCP/IP se
 
 ## Current development (1st May 2020)
 
-HVACsim uses in-line Swing components to create the main simulation window and all visual components. That helped to refine the core capabilities. However, to make the product more versatile it needs an in-built graphics layout tool. The current work includes an evaluation of products like the open-source Window Builder as a way to create a seamless IDE tool. This would make the HMI layout easier to create while retaining the ability to quickly customise the other parts of the simulation in Java. 
+HVACsim uses in-line Swing components to create the main simulation window and all visual components. That helped to refine the core capabilities. However, to make the product more versatile it needs an in-built graphics layout tool. The current work includes an evaluation of products like the open-source Window Builder as a way to create a seamless IDE tool. This would make the HMI layout easier to create and maintain while retaining the ability to quickly customise the other parts of the simulation directly in Java. 
 
 A rough layout of the core components is shown below:
 
