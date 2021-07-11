@@ -18,4 +18,4 @@ HVACsim uses in-line Swing components to create the main simulation window and a
 
 A rough layout of the core components is shown below:
 
-![Module structure](HVACsim_02.jpg)
+![Module structure](HVACsim_03.jpg)
